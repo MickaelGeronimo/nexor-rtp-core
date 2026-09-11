@@ -1,0 +1,58 @@
+<configuration>
+    <!-- ============================================================
+         Nexor RTP Core — Structured JSON Logging Configuration
+         
+         Why JSON logs?
+         - Machine-parseable by log aggregators (Loki, CloudWatch, Datadog)
+         - Correlation IDs and business context become queryable fields
+         - No need for regex parsing pipelines
+         
+         Structure: each log line = one JSON object with:
+           timestamp, level, logger, thread, correlationId (MDC),
+           paymentId (MDC), message, and any key=value markers
+         ============================================================ -->
+
+    <springProfile name="!test">
+        <!-- PRODUCTION: JSON structured output -->
+        <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>correlationId</includeMdcKeyName>
+                <includeMdcKeyName>paymentId</includeMdcKeyName>
+                <includeMdcKeyName>endToEndId</includeMdcKeyName>
+                <includeMdcKeyName>clientIp</includeMdcKeyName>
+                <fieldNames>
+                    <timestamp>timestamp</timestamp>
+                    <message>message</message>
+                    <logger>logger</logger>
+                    <thread>thread</thread>
+                    <levelValue>[ignore]</levelValue>
+                </fieldNames>
+                <customFields>{"service":"nexor-rtp-core","version":"1.0.0"}</customFields>
+                <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                    <maxDepthPerCause>20</maxDepthPerCause>
+                    <rootCauseFirst>true</rootCauseFirst>
+                </throwableConverter>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="STDOUT_JSON"/>
+        </root>
+        <logger name="com.nexor.payments" level="DEBUG"/>
+    </springProfile>
+
+    <springProfile name="test">
+        <!-- TEST: Human-readable for developer ergonomics -->
+        <appender name="STDOUT_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{correlationId:-no-correlation}] - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="WARN">
+            <appender-ref ref="STDOUT_PLAIN"/>
+        </root>
+        <logger name="com.nexor.payments" level="INFO"/>
+    </springProfile>
+
+</configuration>

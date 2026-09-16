@@ -34,15 +34,18 @@ public class JpaLedgerRepositoryAdapter implements LedgerRepositoryPort {
     @PostConstruct
     public void seedInitialAccountsIfEmpty() {
         if (accountRepo.count() == 0) {
-            // Clearing Settlement Transit
-            accountRepo.save(new LedgerAccountJpaEntity(
-                    PaymentSagaOrchestrator.SETTLEMENT_TRANSIT_ACCOUNT.toString(),
-                    "Central Clearing Transit Buffer",
-                    AccountType.LIABILITY,
-                    "BRL",
-                    Money.of("0.00", "BRL").getAmount(),
-                    true
-            ));
+            // Clearing Settlement Transit Accounts (Sharded Transit Buckets 1..16)
+            for (int i = 1; i <= PaymentSagaOrchestrator.SHARDED_TRANSIT_BUCKETS; i++) {
+                AccountId transitId = AccountId.of(String.format("TRANSIT-%03d", i), "0001", "CLEARING");
+                accountRepo.save(new LedgerAccountJpaEntity(
+                        transitId.toString(),
+                        "Central Clearing Transit Buffer #" + i,
+                        AccountType.LIABILITY,
+                        "BRL",
+                        Money.of("0.00", "BRL").getAmount(),
+                        true
+                ));
+            }
 
             // Debtor Corporate Checking
             AccountId debtor = AccountId.of("1001-9", "0001", "NEXOR");

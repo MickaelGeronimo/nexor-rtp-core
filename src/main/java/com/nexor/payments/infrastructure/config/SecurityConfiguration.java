@@ -68,6 +68,22 @@ public class SecurityConfiguration {
             .addFilterBefore(rateLimitingFilter(), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(apiKeyAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
 
+            // Consistent JSON error responses for unauthenticated and forbidden requests
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":\"UNAUTHORIZED\",\"message\":\"Authentication required: missing or invalid API key.\"}");
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":\"FORBIDDEN\",\"message\":\"Access denied: insufficient role or permission.\"}");
+                })
+            )
+
             // Authorization rules
             .authorizeHttpRequests(auth -> auth
                 // Health & metrics endpoints: always public (monitored by load balancers)

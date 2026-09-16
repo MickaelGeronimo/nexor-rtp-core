@@ -7,14 +7,19 @@ import com.nexor.payments.domain.exception.LedgerImbalanceException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -151,6 +156,56 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(
                 "FORBIDDEN",
                 "You do not have permission to perform this action."
+        ));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpServletRequest req) {
+        log.warn("[MALFORMED-REQUEST-BODY] {} | path={}", ex.getMessage(), req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(
+                "MALFORMED_REQUEST_BODY",
+                "Request body is missing, malformed, or contains unreadable JSON format."
+        ));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest req) {
+        log.warn("[METHOD-NOT-SUPPORTED] Method {} not allowed | path={}", ex.getMethod(), req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(error(
+                "METHOD_NOT_ALLOWED",
+                "HTTP method '" + ex.getMethod() + "' is not supported for this endpoint."
+        ));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+        log.warn("[TYPE-MISMATCH] Param {} invalid | path={}", ex.getName(), req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(
+                "INVALID_PARAMETER_TYPE",
+                "Parameter '" + ex.getName() + "' has invalid type or format."
+        ));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParam(
+            MissingServletRequestParameterException ex, HttpServletRequest req) {
+        log.warn("[MISSING-PARAM] Param {} missing | path={}", ex.getParameterName(), req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(
+                "MISSING_REQUIRED_PARAMETER",
+                "Required query parameter '" + ex.getParameterName() + "' must be provided."
+        ));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("[DATA-INTEGRITY-VIOLATION] Uniqueness or constraint violation | path={}", req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error(
+                "DATA_INTEGRITY_CONFLICT",
+                "Database constraint violation or duplicate key conflict."
         ));
     }
 

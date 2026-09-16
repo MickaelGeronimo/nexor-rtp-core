@@ -40,6 +40,30 @@ public class PaymentSagaOrchestrator implements SubmitPaymentUseCase {
 
     // Standard clearing settlement transit account
     public static final AccountId SETTLEMENT_TRANSIT_ACCOUNT = AccountId.of("TRANSIT-001", "0001", "CLEARING");
+    public static final int SHARDED_TRANSIT_BUCKETS = 16;
+
+    /**
+     * Resolves the deterministic Sharded Transit Bucket for a transaction.
+     * Partitions clearing buffer locks across N sub-accounts to eliminate hot-spot contention.
+     */
+    public static AccountId getTransitAccountFor(TransactionId txId) {
+        if (txId == null) {
+            return SETTLEMENT_TRANSIT_ACCOUNT;
+        }
+        int shard = (Math.abs(txId.value().hashCode()) % SHARDED_TRANSIT_BUCKETS) + 1;
+        return AccountId.of(String.format("TRANSIT-%03d", shard), "0001", "CLEARING");
+    }
+
+    /**
+     * Resolves the transit account from the ledger repository:
+     * tries the sharded transit bucket first; if absent, gracefully falls back to the root transit account.
+     */
+    public LedgerAccount resolveTransitAccount(PaymentInstruction instruction) {
+        AccountId shardedId = getTransitAccountFor(instruction.getTransactionId());
+        return ledgerRepository.findAccountById(shardedId)
+                .or(() -> ledgerRepository.findAccountById(SETTLEMENT_TRANSIT_ACCOUNT))
+                .orElseThrow(() -> new IllegalStateException("Transit account not configured: " + SETTLEMENT_TRANSIT_ACCOUNT));
+    }
 
     public PaymentSagaOrchestrator(
             PaymentRepositoryPort paymentRepository,
@@ -196,8 +220,7 @@ public class PaymentSagaOrchestrator implements SubmitPaymentUseCase {
     private void reserveFundsInLedger(PaymentInstruction instruction) {
         LedgerAccount debtor = ledgerRepository.findAccountById(instruction.getDebtorAccountId())
                 .orElseThrow(() -> new IllegalArgumentException("Debtor account not found in ledger: " + instruction.getDebtorAccountId()));
-        LedgerAccount transit = ledgerRepository.findAccountById(SETTLEMENT_TRANSIT_ACCOUNT)
-                .orElseThrow(() -> new IllegalStateException("Transit account not configured: " + SETTLEMENT_TRANSIT_ACCOUNT));
+        LedgerAccount transit = resolveTransitAccount(instruction);
 
         // Leg 1: Debit Debtor (reducing customer liability deposit)
         // Leg 2: Credit Settlement Transit (increasing clearing liability)
@@ -226,8 +249,7 @@ public class PaymentSagaOrchestrator implements SubmitPaymentUseCase {
     private void compensateReservationInLedger(PaymentInstruction instruction, String reason) {
         LedgerAccount debtor = ledgerRepository.findAccountById(instruction.getDebtorAccountId())
                 .orElseThrow(() -> new IllegalStateException("Debtor account missing during compensation"));
-        LedgerAccount transit = ledgerRepository.findAccountById(SETTLEMENT_TRANSIT_ACCOUNT)
-                .orElseThrow(() -> new IllegalStateException("Transit account missing during compensation"));
+        LedgerAccount transit = resolveTransitAccount(instruction);
 
         instruction.markCompensating();
 
@@ -255,8 +277,7 @@ public class PaymentSagaOrchestrator implements SubmitPaymentUseCase {
     }
 
     private void settleBookTransfer(PaymentInstruction instruction) {
-        LedgerAccount transit = ledgerRepository.findAccountById(SETTLEMENT_TRANSIT_ACCOUNT)
-                .orElseThrow(() -> new IllegalStateException("Transit account not configured"));
+        LedgerAccount transit = resolveTransitAccount(instruction);
         LedgerAccount creditor = ledgerRepository.findAccountById(instruction.getCreditorAccountId())
                 .orElseThrow(() -> new IllegalArgumentException("Creditor account not found: " + instruction.getCreditorAccountId()));
 

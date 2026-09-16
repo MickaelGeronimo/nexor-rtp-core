@@ -49,11 +49,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
+        long now = System.currentTimeMillis();
+        evictExpiredCountersIfNecessary(now);
+
         String key = resolveKey(request);
         WindowCounter counter = counters.computeIfAbsent(key, k -> new WindowCounter());
 
         if (!counter.tryIncrement(requestsPerMinute)) {
-            long retryAfterSeconds = (WINDOW_MS - (System.currentTimeMillis() - counter.windowStart)) / 1000 + 1;
+            long retryAfterSeconds = (WINDOW_MS - (now - counter.windowStart)) / 1000 + 1;
             log.warn("[RATE-LIMIT] Key={} exceeded {} req/min threshold", key, requestsPerMinute);
             response.setStatus(429);
             response.setContentType("application/json");
@@ -85,6 +88,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         return "ip:" + request.getRemoteAddr();
     }
 
+    private void evictExpiredCountersIfNecessary(long now) {
+        if (counters.size() > 5000) {
+            counters.entrySet().removeIf(entry -> entry.getValue().isExpired(now));
+        }
+    }
+
     /**
      * Fixed-window counter — thread-safe via synchronized block on the counter instance.
      * We accept the synchronized cost here because rate-limit checks are rare hot paths
@@ -101,6 +110,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                 count.set(0);
             }
             return count.incrementAndGet() <= limit;
+        }
+
+        boolean isExpired(long now) {
+            return (now - windowStart) > (2 * WINDOW_MS);
         }
     }
 }

@@ -24,16 +24,19 @@ public class InMemoryLedgerRepository implements LedgerRepositoryPort {
     }
 
     private void seedAccounts() {
-        // Clearing Settlement Transit Account (Liability/Clearing buffer)
-        accounts.put(PaymentSagaOrchestrator.SETTLEMENT_TRANSIT_ACCOUNT.toString(),
-                new LedgerAccount(
-                        PaymentSagaOrchestrator.SETTLEMENT_TRANSIT_ACCOUNT,
-                        "Central Clearing Transit Buffer",
-                        AccountType.LIABILITY,
-                        "BRL",
-                        Money.of("0.00", "BRL"),
-                        true
-                ));
+        // Clearing Settlement Transit Accounts (Sharded Transit Buckets 1..16)
+        for (int i = 1; i <= PaymentSagaOrchestrator.SHARDED_TRANSIT_BUCKETS; i++) {
+            AccountId transitId = AccountId.of(String.format("TRANSIT-%03d", i), "0001", "CLEARING");
+            accounts.put(transitId.toString(),
+                    new LedgerAccount(
+                            transitId,
+                            "Central Clearing Transit Buffer #" + i,
+                            AccountType.LIABILITY,
+                            "BRL",
+                            Money.of("0.00", "BRL"),
+                            true
+                    ));
+        }
 
         // Sample Customer Debtor Account (Itaú / Nubank Checking)
         AccountId debtor = AccountId.of("1001-9", "0001", "NEXOR");

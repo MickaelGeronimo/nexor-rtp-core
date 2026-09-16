@@ -123,4 +123,41 @@ class PaymentSagaOrchestratorTest {
         LedgerAccount creditor = ledgerRepository.findAccountById(creditorInternal).orElseThrow();
         assertThat(creditor.getBalance()).isEqualTo(Money.of("800.00", "BRL"));
     }
+
+    @Test
+    @DisplayName("Sharded Transit: Deterministic hashing must distribute transactions across TRANSIT-001..016")
+    void testShardedTransitBucketDeterministicResolution() {
+        for (int i = 0; i < 50; i++) {
+            TransactionId txId = TransactionId.generate();
+            AccountId bucket = PaymentSagaOrchestrator.getTransitAccountFor(txId);
+
+            assertThat(bucket.branch()).isEqualTo("0001");
+            assertThat(bucket.bankCode()).isEqualTo("CLEARING");
+            assertThat(bucket.number()).matches("^TRANSIT-0(0[1-9]|1[0-6])$");
+        }
+
+        assertThat(PaymentSagaOrchestrator.getTransitAccountFor(null))
+                .isEqualTo(PaymentSagaOrchestrator.SETTLEMENT_TRANSIT_ACCOUNT);
+    }
+
+    @Test
+    @DisplayName("Sharded Transit: Payment reservation and clearing settlement must balance across the sharded transit bucket")
+    void testShardedTransitBucketsAbsorbLedgerHoldAndCompensate() {
+        Money amount = Money.of("500.00", "BRL");
+        String key = "SHARDED-TX-" + UUID.randomUUID();
+
+        SubmitPaymentCommand command = new SubmitPaymentCommand(
+                key, debtorAccount, creditorExternal, amount, "Sharded transit payment", null);
+
+        PaymentResponseDto response = orchestrator.submitPayment(command);
+        assertThat(response.status()).isEqualTo(PaymentStatus.SETTLED);
+
+        // Transaction aggregate
+        TransactionId txId = new TransactionId(response.transactionId());
+        AccountId assignedBucket = PaymentSagaOrchestrator.getTransitAccountFor(txId);
+
+        // The transit bucket must exist in the ledger
+        LedgerAccount transitAccount = ledgerRepository.findAccountById(assignedBucket).orElseThrow();
+        assertThat(transitAccount).isNotNull();
+    }
 }

@@ -89,9 +89,9 @@ Não basta olhar se o header `Idempotency-Key` já existe:
 ### A. O Gargalo da Conta Transitória Única (Transit Account Hotspot)
 Em produção, sob 5.000 transferências por segundo, cada pagamento em voo credita a conta de liquidação do Banco Central (`TRANSIT-001`). Se você usar lock pessimista (`FOR UPDATE`) ou otimista (`@Version`) em uma **única linha de banco**, você acabou de transformar seu sistema concorrente em uma fila indiana serializada.
 
-**Como resolvemos conceitualmente:**
-- **Sharded Transit Buckets:** A liquidação transitória é particionada em $N$ sub-contas (`TRANSIT-001:BUCKET:{0..15}`) distribuídas pelo hash do ID da transação (`hash(txId) % N`).
-- Cada pagamento bate em um bucket diferente com concorrência limpa, e um job assíncrono faz o *rollup* consolidado para a conta principal sem bloquear o fluxo quente de transferências.
+**Como resolvemos na prática:**
+- **Sharded Transit Buckets:** A liquidação transitória é particionada deterministicamente em 16 sub-contas (`TRANSIT-001` até `TRANSIT-016`) distribuídas pelo hash do ID da transação (`Math.abs(txId.hashCode()) % 16 + 1`).
+- Cada pagamento bate em um bucket diferente com concorrência limpa, eliminando contenção de locks de banco sob milhares de transações simultâneas, mantendo consistência contábil estrita e estorno determinístico.
 
 ### B. Callbacks ISO 20022 que Chegam Fora de Ordem
 No mundo real, o Banco Central responde via webhook assíncrono. Em condições de jitter de rede, o callback `pacs.002` pode bater em um dos nós do seu cluster **antes** mesmo da thread que despachou o `pacs.008` ter concluído o commit do estado inicial no banco de dados.

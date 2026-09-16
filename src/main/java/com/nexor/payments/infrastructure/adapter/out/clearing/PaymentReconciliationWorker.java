@@ -102,7 +102,8 @@ public class PaymentReconciliationWorker {
     private void compensateReservationInLedger(PaymentInstruction instruction, String reason) {
         LedgerAccount debtor = ledgerRepository.findAccountById(instruction.getDebtorAccountId())
                 .orElseThrow(() -> new IllegalStateException("Debtor account missing during reconciliation compensation"));
-        LedgerAccount transit = ledgerRepository.findAccountById(SETTLEMENT_TRANSIT_ACCOUNT)
+        LedgerAccount transit = ledgerRepository.findAccountById(com.nexor.payments.application.saga.PaymentSagaOrchestrator.getTransitAccountFor(instruction.getTransactionId()))
+                .or(() -> ledgerRepository.findAccountById(SETTLEMENT_TRANSIT_ACCOUNT))
                 .orElseThrow(() -> new IllegalStateException("Transit account missing during reconciliation compensation"));
 
         instruction.markRejectedClearing(reason);

@@ -43,7 +43,7 @@ For a portfolio architecture without a Redis dependency, fixed window is the cor
 
 1. **Single-JVM scope:** In a multi-instance deployment, each JVM has its own counter. A client could get `N_instances × 100` requests/minute by load-balancing across instances. Documented in `PRODUCTION_BLUEPRINT.md` as a known gap requiring Redis `INCR + EXPIRE`.
 
-2. **Memory:** `ConcurrentHashMap<String, WindowCounter>` grows unboundedly with unique keys. In production, add a scheduled cleaner or use `Caffeine` cache with TTL.
+2. **Memory Protection (Implemented):** `ConcurrentHashMap<String, WindowCounter>` includes `evictExpiredCountersIfNecessary(now)` triggering an eviction sweep of expired counters whenever the map exceeds 5,000 entries, preventing heap exhaustion under spoofed IP bursts.
 
 3. **No DDoS protection:** This rate limiter is a fraud/abuse guard, not a DDoS mitigation tool. Production DDoS protection belongs at the load balancer/WAF layer (AWS Shield, Cloudflare).
 

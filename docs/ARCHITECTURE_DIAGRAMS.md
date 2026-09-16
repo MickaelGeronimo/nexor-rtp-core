@@ -212,3 +212,82 @@ sequenceDiagram
         TxCoord-->>Recon: committed ✅
     end
 ```
+
+---
+
+## Sharded Transit Buckets — Concurrency & Hotspot Elimination (ADR-010)
+
+```mermaid
+graph TD
+    subgraph Inbound["Concurrent Incoming Payments (5,000+ TPS)"]
+        T1["Payment Tx-1\n(hash: 0x4A1F)"]
+        T2["Payment Tx-2\n(hash: 0x8C3B)"]
+        T3["Payment Tx-3\n(hash: 0x12FE)"]
+        TN["Payment Tx-N\n(hash: 0x99D1)"]
+    end
+
+    subgraph Router["Deterministic Shard Partitioner"]
+        HASH["bucketIndex = (Math.abs(txId.hashCode()) % 16) + 1\nAccountId.of(String.format('TRANSIT-%03d', bucketIndex), '0001', 'CLEARING')"]
+    end
+
+    subgraph Ledger["PostgreSQL Sharded Transit Accounts (ledger_accounts)"]
+        B1["TRANSIT-001\n(Row lock 1)"]
+        B2["TRANSIT-002\n(Row lock 2)"]
+        B3["TRANSIT-003\n(Row lock 3)"]
+        DOTS["..."]
+        B16["TRANSIT-016\n(Row lock 16)"]
+    end
+
+    subgraph Clearing["Central Bank SPI / FedNow Settlement"]
+        BACEN["Central Bank Clearing Settlement\n(pacs.008 Dispatch)"]
+    end
+
+    T1 --> HASH
+    T2 --> HASH
+    T3 --> HASH
+    TN --> HASH
+
+    HASH -->|Bucket 1| B1
+    HASH -->|Bucket 2| B2
+    HASH -->|Bucket 3| B3
+    HASH -->|...| DOTS
+    HASH -->|Bucket 16| B16
+
+    B1 -.-> BACEN
+    B2 -.-> BACEN
+    B3 -.-> BACEN
+    B16 -.-> BACEN
+```
+
+---
+
+## Asynchronous Callback Race Condition Handling (Staging Lease Buffer)
+
+```mermaid
+sequenceDiagram
+    participant Bacen as Central Bank (SPI Webhook)
+    participant Webhook as WebhookController
+    participant Lease as StagingLeaseBuffer (Memory/DB)
+    participant Saga as PaymentSagaWorker
+    participant DB as PostgreSQL
+
+    Note over Bacen,Webhook: Network jitter causes pacs.002 to arrive BEFORE pacs.008 commit
+    Bacen->>Webhook: POST /webhooks/pacs002 (EndToEndId: E2E-9988)
+    Webhook->>DB: findPaymentByEndToEndId("E2E-9988")
+    DB-->>Webhook: empty / NOT_FOUND (Saga dispatch transaction still in-flight)
+    
+    Note over Webhook,Lease: Staging Lease Buffer intercepts 404
+    Webhook->>Lease: stageCallback(endToEndId="E2E-9988", payload, ttl=5000ms)
+    Webhook-->>Bacen: 202 Accepted (Callback held in quarantine lease)
+    
+    Note over Saga,DB: Saga thread finishes network dispatch and commits initial record
+    Saga->>DB: COMMIT PaymentInstruction (status=SUBMITTED_TO_CLEARING)
+    
+    Note over Lease,DB: Poller / Correlator picks up staged callback
+    Lease->>DB: correlateStagedCallback("E2E-9988")
+    DB-->>Lease: PaymentInstruction found!
+    Lease->>DB: UPDATE PaymentInstruction SET status='SETTLED'
+    Lease->>DB: INSERT INTO outbox_events ('PAYMENT_SETTLED')
+    Lease->>DB: DELETE FROM staged_callbacks WHERE end_to_end_id='E2E-9988'
+```
+

@@ -27,6 +27,18 @@ O **Nexor RTP Core** foi desenhado com Arquitetura Hexagonal (Ports & Adapters) 
 
 ## O Pipeline Transacional
 
+```mermaid
+flowchart LR
+    IDEM["<b>1. Idempotência</b><br/>Fingerprint SHA-256<br/>Lock DB (Lease 2m)"] --> RISK["<b>2. Risco / AML</b><br/>Sanções + Velocidade<br/>Teto de Valor"]
+    RISK --> ROUTER["<b>3. Smart Router</b><br/>Pix / FedNow /<br/>Book Transfer"]
+    ROUTER --> HOLD["<b>4. Reserva ACID</b><br/>Débito Pagador<br/>Crédito Transit Shard<br/>(Transação Curta &lt;5ms)"]
+    HOLD --> DISPATCH["<b>5. Despacho ISO 20022</b><br/>pacs.008 Dispatch<br/>(100% Fora do Banco)"]
+    DISPATCH --> SETTLE{"<b>6. Liquidação / Saga</b><br/>pacs.002"}
+    SETTLE -->|ACSC| OK["<b>Liquidado</b><br/>Trânsito Baixado<br/>Outbox Kafka"]
+    SETTLE -->|RJCT| COMP["<b>Compensação</b><br/>Estorno Contábil<br/>Crédito Pagador"]
+    SETTLE -->|Timeout| INVEST["<b>Investigação</b><br/>Retém no Transit<br/>Reconciliador pacs.028"]
+```
+
 ```
                    ┌─────────────────────────────────────────────────────────┐
                    │                 Pipeline de Pagamento                   │
@@ -123,6 +135,38 @@ com.nexor.payments/
     ├── adapter/out/clearing/   # Adaptador de mock do trilho e worker de reconciliação
     └── config/                 # Filtros de segurança e rate limiting
 ```
+
+---
+
+## Documentação de Engenharia, Diagramas & ADRs
+
+O ecossistema do Nexor RTP Core possui documentação técnica detalhada, diagramas C4 interativos e registros formais de decisões de arquitetura:
+
+* 📐 **[Diagramas de Arquitetura & Sequência (docs/ARCHITECTURE_DIAGRAMS.md)](docs/ARCHITECTURE_DIAGRAMS.md):**
+  - **C4 Nível 1 (System Context):** Integração com SPI/FedNow, Kafka e clientes bancários.
+  - **C4 Nível 2 (Containers):** Separação entre Web API, PostgreSQL, Outbox Relay e Reconciliador.
+  - **C4 Nível 3 (Componentes Hexagonais):** Camadas de Domínio, Portas de Entrada/Saída e Adaptadores.
+  - **Máquina de Estados de Pagamento (FSM):** Transições formais (`VALIDATED` $\rightarrow$ `FUNDS_RESERVED` $\rightarrow$ `SETTLED` / `PENDING_INVESTIGATION` / `COMPENSATED`).
+  - **Sequência Transactional Outbox:** Persistência atômica com `SKIP LOCKED` e tolerância a falhas no Kafka.
+  - **Sequência do Reconciliador:** Ciclo de auditoria assíncrona fora da transação relacional.
+  - **Sharded Transit Buckets:** Particionamento anti-hotspot em 16 shards para 5.000+ TPS.
+  - **Correlacionador Assíncrono:** Tratamento de callbacks `pacs.002` fora de ordem via staging lease buffer.
+
+* 🏗️ **[Blueprint de Produção & Nuvem (docs/PRODUCTION_BLUEPRINT.md)](docs/PRODUCTION_BLUEPRINT.md):**
+  - Topologia de referência AWS Multi-AZ (EKS, Aurora PostgreSQL Multi-AZ, Amazon MSK).
+  - Matriz de Prontidão Operacional cobrindo 20 dimensões de missão crítica (Zero Trust, mTLS, Debezium CDC, RPO=0 / RTO < 30s).
+
+* 📜 **[Architecture Decision Records — ADRs (docs/adr/)](docs/adr/):**
+  - [ADR-001](docs/adr/ADR-001-hexagonal-architecture.md): Arquitetura Hexagonal e Isolamento Limpo de Domínio
+  - [ADR-002](docs/adr/ADR-002-double-entry-ledger-invariants.md): Livro-Razão de Partidas Dobradas e Invariante de Soma Zero
+  - [ADR-003](docs/adr/ADR-003-distributed-idempotency-sha256.md): Idempotência com Fingerprint Determinístico SHA-256
+  - [ADR-004](docs/adr/ADR-004-transactional-outbox-skip-locked.md): Transactional Outbox com `FOR UPDATE SKIP LOCKED`
+  - [ADR-005](docs/adr/ADR-005-timeout-is-not-failure.md): Timeout Não é Falha (Reconciliação Assíncrona contra Duplo Crédito)
+  - [ADR-006](docs/adr/ADR-006-scoped-acid-boundaries-saga.md): Fronteiras ACID Escopadas no Saga Orquestrador
+  - [ADR-007](docs/adr/ADR-007-rate-limiting-strategy.md): Rate Limiting com Evicção Ativa de Memória
+  - [ADR-008](docs/adr/ADR-008-optimistic-vs-pessimistic-locking.md): Lock Otimista vs Pessimista em Contas Contábeis
+  - [ADR-009](docs/adr/ADR-009-security-model.md): Modelo de Segurança (API Key + RBAC)
+  - [ADR-010](docs/adr/ADR-010-sharded-transit-buckets.md): Sharded Transit Buckets para Eliminação de Gargalo Central
 
 ---
 

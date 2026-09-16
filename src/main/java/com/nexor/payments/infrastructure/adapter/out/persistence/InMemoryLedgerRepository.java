@@ -38,7 +38,7 @@ public class InMemoryLedgerRepository implements LedgerRepositoryPort {
                     ));
         }
 
-        // Sample Customer Debtor Account (Itaú / Nubank Checking)
+        // Debtor Corporate Checking Account
         AccountId debtor = AccountId.of("1001-9", "0001", "NEXOR");
         accounts.put(debtor.toString(),
                 new LedgerAccount(
@@ -50,7 +50,7 @@ public class InMemoryLedgerRepository implements LedgerRepositoryPort {
                         false
                 ));
 
-        // Sample Customer Creditor Account
+        // Creditor Merchant Account
         AccountId creditor = AccountId.of("2002-8", "0001", "NEXOR");
         accounts.put(creditor.toString(),
                 new LedgerAccount(

@@ -43,7 +43,7 @@ NEXOR_SECURITY_API_KEYS_ADMIN=<secret>
 
 ## Why API Key instead of JWT/OAuth2?
 
-This is a deliberate scope choice for a portfolio project:
+This is a deliberate architectural decoupling choice for a standalone reference service:
 
 | Aspect | API Key (chosen) | JWT / OAuth2 |
 |---|---|---|

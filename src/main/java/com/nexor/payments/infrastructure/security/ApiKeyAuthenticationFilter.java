@@ -28,8 +28,8 @@ import java.util.Objects;
  *
  * <p><b>Production note:</b> In production, API keys should be hashed with
  * Argon2 before storage and looked up via constant-time comparison to
- * prevent timing attacks. This implementation uses plaintext keys loaded
- * from environment variables — acceptable for a portfolio architecture.
+ * prevent timing attacks. This reference implementation uses configuration keys loaded
+ * from environment variables or application secrets.
  */
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 

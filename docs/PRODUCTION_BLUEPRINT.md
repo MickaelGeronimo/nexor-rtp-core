@@ -72,7 +72,7 @@ The codebase implements the core financial transaction engine: double-entry ledg
 | **4** | **Message Streaming** | Embedded / Testcontainers Kafka (`spring-kafka`). | Amazon MSK across 3 Availability Zones, replication factor = 3, `min.insync.replicas = 2`, TLS in-transit and KMS encryption at rest. |
 | **5** | **Observability** | Micrometer + Prometheus Actuator endpoints. | OpenTelemetry Collector pipeline, Grafana RED dashboards (Rate, Errors, Duration), and SLO alerts via PagerDuty. |
 | **6** | **Cloud Deployment** | Dockerfile and Docker Compose. | Helm charts with Kustomize, GitOps deployment via ArgoCD supporting Canary and Blue/Green progressive rollouts. |
-| **7** | **CI/CD Automation** | Maven lifecycle (`mvn clean test`). | GitHub Actions pipeline running the 47 automated tests, ArchUnit architectural rules, SonarQube quality gates, and Trivy vulnerability scanning. |
+| **7** | **CI/CD Automation** | Maven lifecycle (`mvn clean test`). | GitHub Actions pipeline running the 54 automated tests, ArchUnit architectural rules, SonarQube quality gates, and Trivy vulnerability scanning. |
 | **8** | **Infrastructure as Code** | Docker Compose for local development. | Terraform / OpenTofu modules (VPC, EKS, Aurora, MSK) with remote state locking in S3 + DynamoDB. |
 | **9** | **Load & Stress Testing** | Concurrent thread tests and k6 load script. | Automated performance pipelines running `k6-payment-load-test.js` against staging environments to validate throughput and p95/p99 latency under load. |
 | **10**| **Chaos Engineering** | Unit and integration failure mode tests. | Chaos Mesh or AWS FIS injecting network packet drops, node failovers, and broker partition loss during active traffic. |

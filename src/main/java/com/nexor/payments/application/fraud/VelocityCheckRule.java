@@ -52,7 +52,15 @@ public class VelocityCheckRule implements FraudRule {
                             accountKey, maxTransactionsPerMinute));
         }
 
+        evictOldEntriesIfNecessary(currentEpochMinute);
+
         return FraudEvaluationResult.approve(getRuleName());
+    }
+
+    private void evictOldEntriesIfNecessary(long currentEpochMinute) {
+        if (velocityStore.size() > 5000) {
+            velocityStore.entrySet().removeIf(entry -> entry.getValue().epochMinute < currentEpochMinute);
+        }
     }
 
     private record AccountVelocity(long epochMinute, AtomicInteger counter) {}

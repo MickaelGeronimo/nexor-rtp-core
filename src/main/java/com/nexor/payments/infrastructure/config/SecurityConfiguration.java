@@ -21,10 +21,10 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  * AUDITOR (can GET ledger/journal endpoints), ADMIN (all endpoints).
  *
  * <p><b>Why API Key instead of OAuth2/JWT?</b>
- * This is a portfolio architecture. In production, you would integrate with your
- * bank's IAM system (Keycloak, Okta, AWS Cognito) for OIDC + JWT. The API Key
+ * In enterprise deployments, you typically integrate with your
+ * institution's IAM system (Keycloak, Okta, AWS Cognito) for OIDC + JWT. The API Key
  * layer here demonstrates the structural pattern (filter → authentication → authorization)
- * without requiring an external IdP dependency that would complicate local testing.
+ * without requiring an external IdP dependency that would complicate standalone execution.
  * See ADR-009 for the full trade-off discussion.
  *
  * <p><b>Rate limiting:</b> Sliding-window counter per API key, 100 req/min default.

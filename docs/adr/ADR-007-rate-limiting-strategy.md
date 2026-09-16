@@ -34,7 +34,7 @@ Implement a **fixed-window counter per API Key** (falling back to client IP) in 
 | Sliding Window Log | Most accurate | High memory: O(n) per key |
 | Redis + INCR/EXPIRE | Distributed, exact | External dependency, network latency, operational complexity |
 
-For a portfolio architecture without a Redis dependency, fixed window is the correct starting point. The "2x burst at boundary" edge case is acceptable here because:
+For a self-contained reference core without an external Redis dependency, fixed window is the correct baseline. The "2x burst at boundary" edge case is acceptable here because:
 - API keys are pre-authenticated
 - The burst window (< 2s) is too short for meaningful financial abuse
 - A multi-node production deployment would add Redis-backed distributed counters

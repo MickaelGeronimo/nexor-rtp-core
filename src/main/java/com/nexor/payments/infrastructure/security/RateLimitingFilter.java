@@ -20,10 +20,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Each key gets at most {@code requestsPerMinute} requests per 60-second window.
  * Window resets atomically when 60 seconds have elapsed.
  *
- * <p><b>Why not token bucket / leaky bucket?</b> Token bucket is strictly better
- * (smoother bursts), but requires a scheduled cleanup thread or an external store.
- * This fixed-window implementation is single-JVM, stateless across restarts,
- * and avoids pulling in Redis or Resilience4j for a portfolio project.
+ * <p><b>Why not token bucket / leaky bucket?</b> Token bucket is smoother for bursts,
+ * but requires a scheduled background thread or distributed cache.
+ * This fixed-window implementation is lightweight, deterministic,
+ * and maintains zero external infrastructure dependencies in the core service.
  * See ADR-007 for the full discussion.
  *
  * <p><b>Production gap:</b> This counter is per-JVM. In a multi-instance deployment,

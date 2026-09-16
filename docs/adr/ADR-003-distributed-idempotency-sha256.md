@@ -10,7 +10,7 @@
 
 In real-time payment networks, client network retries and webhook retries are standard occurrences. If a client sends a payment request, experiences an HTTP connection drop, and retries the request with the same `Idempotency-Key`, the system must not process a duplicate debit.
 
-Furthermore, an attacker or buggy client could attempt to reuse a previously successful `Idempotency-Key` with altered payment parameters (e.g., higher amount or different recipient).
+Additionally, an attacker or buggy client could attempt to reuse a previously successful `Idempotency-Key` with altered payment parameters (e.g., higher amount or different recipient).
 
 ## Decision
 

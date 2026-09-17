@@ -52,4 +52,4 @@ For a self-contained reference core without an external Redis dependency, fixed 
 - Added `RateLimitingFilter` registered before Spring Security's auth filter
 - Configurable limit via `application.yml`
 - 429 response includes `Retry-After` header for well-behaved clients
-- `RateLimitingFilterTest` covers concurrent correctness with 200 virtual threads
+- `RateLimitingFilterTest` covers concurrent correctness with 200 concurrent threads (Java 17 LTS compatible)

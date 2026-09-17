@@ -12,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexor -d nexor_payments"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -41,6 +46,27 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
+
+  # 4. Nexor RTP Core Backend (Spring Boot 3.3.4 / Java 17 LTS)
+  nexor-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexor-backend
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nexor_payments
+      SPRING_DATASOURCE_USERNAME: nexor
+      SPRING_DATASOURCE_PASSWORD: nexor_secret_password
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
 
 volumes:
   postgres_data:
